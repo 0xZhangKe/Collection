@@ -10,5 +10,7 @@
 
     <declare-styleable name="NumberInputView">
         <attr name="box_count" format="integer"/>
+        <attr name="box_color" format="color"/>
+        <attr name="text_color" format="color"/>
     </declare-styleable>
 </resources>

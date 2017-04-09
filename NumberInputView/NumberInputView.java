@@ -8,13 +8,9 @@ import android.graphics.RectF;
 import android.support.annotation.AttrRes;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v7.widget.AppCompatEditText;
-import android.support.v7.widget.AppCompatTextView;
-import android.text.Editable;
 import android.text.InputType;
 import android.text.TextPaint;
 import android.text.TextUtils;
-import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -22,12 +18,12 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.TextView;
 
-import java.util.List;
-
+import com.zhangke.window.R;
+import com.zhangke.window.UiTools;
 
 /**
+ * 验证码输入框
  * @author 张可
  * @version 1.0
  * @date 2017.03.27
@@ -39,9 +35,13 @@ public class NumberInputView extends View {
      */
     private int count = 4;
     /**
-     * 每个框大小
+     * 单个输入框的宽度
      */
-    private int boxSize;
+    private int boxWidth;
+    /**
+     * 单个输入框的高度
+     */
+    private int boxHeight;
     /**
      * 文本大小
      */
@@ -51,9 +51,9 @@ public class NumberInputView extends View {
      */
     private int textColor;
     /**
-     * padding
+     * 边框颜色
      */
-    private int padding;
+    private int boxColor;
 
     /**
      * 当前已输入的文本
@@ -76,6 +76,10 @@ public class NumberInputView extends View {
         if (null != attrs) {
             TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.NumberInputView);
             count = a.getInteger(R.styleable.NumberInputView_box_count, 4);
+            textColor = a.getColor(R.styleable.NumberInputView_text_color,
+                    getContext().getResources().getColor(R.color.text_black));
+            boxColor = a.getColor(R.styleable.NumberInputView_box_color,
+                    getContext().getResources().getColor(R.color.text_black));
             a.recycle();
         }
         init();
@@ -86,43 +90,74 @@ public class NumberInputView extends View {
         if (null != attrs) {
             TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.NumberInputView);
             count = a.getInteger(R.styleable.NumberInputView_box_count, 4);
+            textColor = a.getColor(R.styleable.NumberInputView_text_color,
+                    getContext().getResources().getColor(R.color.text_black));
+            boxColor = a.getColor(R.styleable.NumberInputView_box_color,
+                    getContext().getResources().getColor(R.color.text_black));
             a.recycle();
         }
         init();
     }
 
     private void init() {
-        boxSize = UiTools.dip2px(getContext(), 50);
-        padding = UiTools.dip2px(getContext(), 5);
+        boxWidth = UiTools.dip2px(getContext(), 50);
+        boxHeight = UiTools.dip2px(getContext(), 50);
         textSize = UiTools.sp2px(getContext(), 20);
-        textColor = getContext().getResources().getColor(R.color.text_black);
-        List l;
 
         boxPaint.setAntiAlias(true);
-        boxPaint.setColor(getContext().getResources().getColor(R.color.text_black));
         boxPaint.setStyle(Paint.Style.STROKE);
+        boxPaint.setColor(boxColor);
 
         textPaint.setTextSize(textSize);
         textPaint.setColor(textColor);
         textPaint.setTextAlign(Paint.Align.CENTER);
-        Paint.FontMetrics fontMetrics = textPaint.getFontMetrics();
-        float fontHeight = fontMetrics.bottom - fontMetrics.top;
 
         inputMethodManager = (InputMethodManager) getContext()
                 .getSystemService(Context.INPUT_METHOD_SERVICE);
 
         setFocusableInTouchMode(true);
         showInputMethod();
-        setBackground(null);
     }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int width;
-        int height;
-        width = count * boxSize + padding * 2;
-        height = boxSize + padding * 2;
-        setMeasuredDimension(width, height);
+        int widthSpecModel = MeasureSpec.getMode(widthMeasureSpec);
+        int heightSpecModel = MeasureSpec.getMode(heightMeasureSpec);
+        int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+        int heightSize = MeasureSpec.getSize(heightMeasureSpec);
+
+        int mWidth = getDefaultWidth();
+        int mHeight = getDefaultHeight();
+
+        switch (widthSpecModel) {
+            case MeasureSpec.EXACTLY:
+                boxWidth = widthSize / count;
+                mWidth = widthSize;
+                break;
+            case MeasureSpec.AT_MOST:
+            case MeasureSpec.UNSPECIFIED:
+                mWidth = getDefaultWidth();
+                break;
+        }
+        switch (heightSpecModel) {
+            case MeasureSpec.EXACTLY:
+                boxHeight = heightSize;
+                mHeight = heightSize;
+                break;
+            case MeasureSpec.AT_MOST:
+            case MeasureSpec.UNSPECIFIED:
+                mHeight = getDefaultHeight();
+                break;
+        }
+        setMeasuredDimension(mWidth, mHeight);
+    }
+
+    private int getDefaultWidth() {
+        return count * boxWidth;
+    }
+
+    private int getDefaultHeight() {
+        return boxHeight;
     }
 
     @Override
@@ -141,7 +176,7 @@ public class NumberInputView extends View {
             }
             for (int i = 0; i < currentNumber.length(); i++) {
                 canvas.drawText("" + currentNumber.charAt(i),
-                        padding + boxSize * i + (boxSize / 2),
+                        boxWidth * i + (boxWidth / 2),
                         y,
                         textPaint);
             }
@@ -155,17 +190,17 @@ public class NumberInputView extends View {
      * @param canvas
      */
     private void drawFrame(Canvas canvas) {
-        RectF oval = new RectF(padding,
-                padding,
-                getWidth() - padding,
-                getHeight() - padding);
+        RectF oval = new RectF(0,
+                0,
+                getWidth(),
+                getHeight());
         canvas.drawRoundRect(oval, 10, 10, boxPaint);
 
         for (int i = 1; i < count; i++) {
-            canvas.drawLine(padding + boxSize * i,
-                    padding,
-                    padding + boxSize * i,
-                    padding + boxSize,
+            canvas.drawLine(boxWidth * i,
+                    0,
+                    boxWidth * i,
+                    boxHeight,
                     boxPaint);
         }
     }
