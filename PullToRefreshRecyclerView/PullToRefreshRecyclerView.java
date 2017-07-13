@@ -1,0 +1,200 @@
+package com.zhangke.widget;
+
+import android.content.Context;
+import android.support.annotation.Nullable;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.RotateAnimation;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+
+/**
+ * Created by 张可 on 2017/7/5.
+ */
+
+public class PullToRefreshRecyclerView extends FrameLayout {
+
+    private static final String TAG = "PullToRefreshRecycler";
+
+    private View rootView;
+    private RecyclerView recyclerView;
+    private View footView;
+    private ProgressBar progressBar;
+    private TextView tvLoadTag;
+    private ImageView imgArrow;
+
+    private int footViewHeight = 100;
+
+
+    private int lastDownY;
+
+    private boolean canScroll = false;
+    private boolean canLoad = false;
+    /**
+     * 箭头方向是否向上
+     */
+    private boolean arrowIsTop = true;
+
+    private RotateAnimation bottomAnimation;//箭头由上到下的动画
+    private RotateAnimation topAnimation;//箭头由下到上的动画
+
+    public PullToRefreshRecyclerView(Context context) {
+        super(context);
+        init();
+    }
+
+    public PullToRefreshRecyclerView(Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+
+    private void init() {
+        inflate(getContext(), R.layout.view_pull_to_refresh_recycler, this);
+
+        rootView = findViewById(R.id.root_view);
+
+        recyclerView = (RecyclerView) findViewById(R.id.recycler_view);
+        footView = findViewById(R.id.footer_view);
+        progressBar = (ProgressBar) findViewById(R.id.progress);
+        tvLoadTag = (TextView) findViewById(R.id.tv_load_tag);
+        imgArrow = (ImageView) findViewById(R.id.img_arrow);
+
+        footViewHeight = UiTools.dip2px(getContext(), 80);
+
+        recyclerView.setLayoutManager(new GridLayoutManager(getContext(), 2));
+
+        bottomAnimation = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        bottomAnimation.setDuration(200);
+        bottomAnimation.setFillAfter(true);
+
+        topAnimation = new RotateAnimation(180, 0, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        topAnimation.setDuration(200);
+        topAnimation.setFillAfter(true);
+    }
+
+    public void setLayoutManager(RecyclerView.LayoutManager layout){
+        recyclerView.setLayoutManager(layout);
+    }
+
+    public void setAdapter(RecyclerView.Adapter adapter) {
+        recyclerView.setAdapter(adapter);
+        adapter.notifyDataSetChanged();
+    }
+
+    @Override
+    public void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        final int height = getMeasuredHeight() + footViewHeight;
+        setMeasuredDimension(getMeasuredWidth(), height);
+
+        FrameLayout.LayoutParams rootLP = (FrameLayout.LayoutParams)rootView.getLayoutParams();
+        rootLP.height = height;
+        rootView.setLayoutParams(rootLP);
+
+        FrameLayout.LayoutParams recyclerLp = (FrameLayout.LayoutParams)recyclerView.getLayoutParams();
+        recyclerLp.height = height - footViewHeight;
+        recyclerView.setLayoutParams(recyclerLp);
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        if (recyclerView == null || recyclerView.getChildCount() == 0)
+            return super.onInterceptTouchEvent(ev);
+        switch(ev.getAction()){
+            case MotionEvent.ACTION_DOWN:
+                lastDownY = (int) ev.getY();
+                        break;
+            case MotionEvent.ACTION_MOVE:
+                int offerY = (int) ev.getY() - lastDownY;
+                if(offerY < 0){
+                    View lastView = recyclerView.getChildAt( recyclerView.getChildCount() - 1);
+                    if(lastView != null && lastView.getBottom() + footViewHeight <= getHeight()){
+                        canScroll = true;
+                        return true;
+                    }else{
+                        canScroll = false;
+                    }
+                }else{
+                    canScroll = false;
+                }
+                break;
+
+        }
+        return super.onInterceptTouchEvent(ev);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        if (recyclerView == null || recyclerView.getChildCount() == 0)
+            return super.onInterceptTouchEvent(ev);
+        switch(ev.getAction()){
+            case MotionEvent.ACTION_DOWN:
+                lastDownY = (int) ev.getY();
+                break;
+            case MotionEvent.ACTION_MOVE:
+                int offerY = (int) ev.getY() - lastDownY;
+                if(offerY < 0){
+                    View lastView = recyclerView.getChildAt( recyclerView.getChildCount() - 1);
+                    if(lastView != null && lastView.getBottom() + footViewHeight <= getHeight()){
+                        scrollTo(getScrollX(), -offerY / 2);
+                        imgArrow.setVisibility(VISIBLE);
+                        if(Math.abs(offerY) / 2 < footViewHeight){
+                            progressBar.setVisibility(GONE);
+                            tvLoadTag.setText("上拉加载数据");
+                            if(!arrowIsTop) {
+                                imgArrow.startAnimation(topAnimation);
+                                arrowIsTop = true;
+                            }
+                            canLoad = false;
+                        }else{
+                            progressBar.setVisibility(GONE);
+                            tvLoadTag.setText("松手加载更多");
+                            if(arrowIsTop) {
+                                imgArrow.startAnimation(bottomAnimation);
+                                arrowIsTop = false;
+                            }
+                            canLoad = true;
+                        }
+                        return true;
+                    }else{
+                        canLoad = false;
+                    }
+                }else{
+                    canLoad = false;
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+                if(canScroll) {
+                    if(canLoad == false){
+                        scrollTo(getScrollX(),0);
+                    }else{
+                        scrollTo(getScrollX(), footViewHeight);
+                        loadData();
+                    }
+                    canScroll = false;
+                }
+                break;
+        }
+        return super.onTouchEvent(ev);
+    }
+
+    private void loadData(){
+        imgArrow.clearAnimation();
+        imgArrow.setVisibility(GONE);
+        progressBar.setVisibility(VISIBLE);
+        tvLoadTag.setText("正在加载...");
+        postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                progressBar.setVisibility(GONE);
+                scrollTo(getScrollX(), 0);
+            }
+        }, 500);
+    }
+}
