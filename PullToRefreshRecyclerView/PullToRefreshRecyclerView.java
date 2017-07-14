@@ -1,4 +1,4 @@
-package com.zhangke.widget;
+﻿package com.zhangke.widget;
 
 import android.content.Context;
 import android.support.annotation.Nullable;
@@ -31,11 +31,11 @@ public class PullToRefreshRecyclerView extends FrameLayout {
 
     private int footViewHeight = 100;
 
-
     private int lastDownY;
 
     private boolean canScroll = false;
     private boolean canLoad = false;
+    private boolean isLoading = false;//是否正在加载，正在加载时拦截滑动事件
     /**
      * 箭头方向是否向上
      */
@@ -43,6 +43,8 @@ public class PullToRefreshRecyclerView extends FrameLayout {
 
     private RotateAnimation bottomAnimation;//箭头由上到下的动画
     private RotateAnimation topAnimation;//箭头由下到上的动画
+
+    private OnPullToBottomListener onPullToBottomListener;
 
     public PullToRefreshRecyclerView(Context context) {
         super(context);
@@ -67,8 +69,6 @@ public class PullToRefreshRecyclerView extends FrameLayout {
 
         footViewHeight = UiTools.dip2px(getContext(), 80);
 
-        recyclerView.setLayoutManager(new GridLayoutManager(getContext(), 2));
-
         bottomAnimation = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         bottomAnimation.setDuration(200);
         bottomAnimation.setFillAfter(true);
@@ -78,7 +78,7 @@ public class PullToRefreshRecyclerView extends FrameLayout {
         topAnimation.setFillAfter(true);
     }
 
-    public void setLayoutManager(RecyclerView.LayoutManager layout){
+    public void setLayoutManager(RecyclerView.LayoutManager layout) {
         recyclerView.setLayoutManager(layout);
     }
 
@@ -87,17 +87,21 @@ public class PullToRefreshRecyclerView extends FrameLayout {
         adapter.notifyDataSetChanged();
     }
 
+    public RecyclerView getRecyclerView() {
+        return recyclerView;
+    }
+
     @Override
     public void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         final int height = getMeasuredHeight() + footViewHeight;
         setMeasuredDimension(getMeasuredWidth(), height);
 
-        FrameLayout.LayoutParams rootLP = (FrameLayout.LayoutParams)rootView.getLayoutParams();
+        LayoutParams rootLP = (LayoutParams) rootView.getLayoutParams();
         rootLP.height = height;
         rootView.setLayoutParams(rootLP);
 
-        FrameLayout.LayoutParams recyclerLp = (FrameLayout.LayoutParams)recyclerView.getLayoutParams();
+        LayoutParams recyclerLp = (LayoutParams) recyclerView.getLayoutParams();
         recyclerLp.height = height - footViewHeight;
         recyclerView.setLayoutParams(recyclerLp);
     }
@@ -106,21 +110,21 @@ public class PullToRefreshRecyclerView extends FrameLayout {
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         if (recyclerView == null || recyclerView.getChildCount() == 0)
             return super.onInterceptTouchEvent(ev);
-        switch(ev.getAction()){
+        switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 lastDownY = (int) ev.getY();
-                        break;
+                break;
             case MotionEvent.ACTION_MOVE:
                 int offerY = (int) ev.getY() - lastDownY;
-                if(offerY < 0){
-                    View lastView = recyclerView.getChildAt( recyclerView.getChildCount() - 1);
-                    if(lastView != null && lastView.getBottom() + footViewHeight <= getHeight()){
+                if (offerY < 0) {
+                    View lastView = recyclerView.getChildAt(recyclerView.getChildCount() - 1);
+                    if (lastView != null && lastView.getBottom() + footViewHeight <= getHeight()) {
                         canScroll = true;
                         return true;
-                    }else{
+                    } else {
                         canScroll = false;
                     }
-                }else{
+                } else {
                     canScroll = false;
                 }
                 break;
@@ -133,47 +137,47 @@ public class PullToRefreshRecyclerView extends FrameLayout {
     public boolean onTouchEvent(MotionEvent ev) {
         if (recyclerView == null || recyclerView.getChildCount() == 0)
             return super.onInterceptTouchEvent(ev);
-        switch(ev.getAction()){
+        switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 lastDownY = (int) ev.getY();
                 break;
             case MotionEvent.ACTION_MOVE:
                 int offerY = (int) ev.getY() - lastDownY;
-                if(offerY < 0){
-                    View lastView = recyclerView.getChildAt( recyclerView.getChildCount() - 1);
-                    if(lastView != null && lastView.getBottom() + footViewHeight <= getHeight()){
+                if (offerY < 0) {
+                    View lastView = recyclerView.getChildAt(recyclerView.getChildCount() - 1);
+                    if (lastView != null && lastView.getBottom() + footViewHeight <= getHeight()) {
                         scrollTo(getScrollX(), -offerY / 2);
                         imgArrow.setVisibility(VISIBLE);
-                        if(Math.abs(offerY) / 2 < footViewHeight){
+                        if (Math.abs(offerY) / 2 < footViewHeight) {
                             progressBar.setVisibility(GONE);
                             tvLoadTag.setText("上拉加载数据");
-                            if(!arrowIsTop) {
+                            if (!arrowIsTop) {
                                 imgArrow.startAnimation(topAnimation);
                                 arrowIsTop = true;
                             }
                             canLoad = false;
-                        }else{
+                        } else {
                             progressBar.setVisibility(GONE);
                             tvLoadTag.setText("松手加载更多");
-                            if(arrowIsTop) {
+                            if (arrowIsTop) {
                                 imgArrow.startAnimation(bottomAnimation);
                                 arrowIsTop = false;
                             }
                             canLoad = true;
                         }
                         return true;
-                    }else{
+                    } else {
                         canLoad = false;
                     }
-                }else{
+                } else {
                     canLoad = false;
                 }
                 break;
             case MotionEvent.ACTION_UP:
-                if(canScroll) {
-                    if(canLoad == false){
-                        scrollTo(getScrollX(),0);
-                    }else{
+                if (canScroll) {
+                    if (canLoad == false) {
+                        scrollTo(getScrollX(), 0);
+                    } else {
                         scrollTo(getScrollX(), footViewHeight);
                         loadData();
                     }
@@ -184,17 +188,43 @@ public class PullToRefreshRecyclerView extends FrameLayout {
         return super.onTouchEvent(ev);
     }
 
-    private void loadData(){
+    private void loadData() {
+        isLoading = true;
         imgArrow.clearAnimation();
         imgArrow.setVisibility(GONE);
         progressBar.setVisibility(VISIBLE);
         tvLoadTag.setText("正在加载...");
-        postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                progressBar.setVisibility(GONE);
-                scrollTo(getScrollX(), 0);
-            }
-        }, 500);
+        if (this.onPullToBottomListener != null) {
+            this.onPullToBottomListener.onPullToBottom();
+        } else {
+            progressBar.setVisibility(GONE);
+            scrollTo(getScrollX(), 0);
+        }
+    }
+
+    /**
+     * 设置是否正在加载，一般来书，在加载完毕之后应该调用此方法
+     *
+     * @param loading
+     */
+    public void setLoading(boolean loading) {
+        isLoading = loading;
+        if (!isLoading) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    progressBar.setVisibility(GONE);
+                    scrollTo(getScrollX(), 0);
+                }
+            });
+        }
+    }
+
+    public void setOnPullToBottomListener(OnPullToBottomListener onPullToBottomListener) {
+        this.onPullToBottomListener = onPullToBottomListener;
+    }
+
+    public interface OnPullToBottomListener {
+        void onPullToBottom();
     }
 }
