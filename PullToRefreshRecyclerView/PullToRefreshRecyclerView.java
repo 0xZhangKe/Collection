@@ -71,11 +71,11 @@ public class PullToRefreshRecyclerView extends FrameLayout {
 
         rootView = findViewById(R.id.root_view);
 
-        recyclerView = (RecyclerView) findViewById(R.id.recycler_view);
-        footView = findViewById(R.id.footer_view);
-        progressBar = (ProgressBar) findViewById(R.id.progress);
-        tvLoadTag = (TextView) findViewById(R.id.tv_load_tag);
-        imgArrow = (ImageView) findViewById(R.id.img_arrow);
+        recyclerView = (RecyclerView) rootView.findViewById(R.id.recycler_view);
+        footView = rootView.findViewById(R.id.footer_view);
+        progressBar = (ProgressBar) rootView.findViewById(R.id.progress);
+        tvLoadTag = (TextView) rootView.findViewById(R.id.tv_load_tag);
+        imgArrow = (ImageView) rootView.findViewById(R.id.img_arrow);
 
         footViewHeight = UiTools.dip2px(getContext(), 80);
 
