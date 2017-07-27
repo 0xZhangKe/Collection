@@ -154,7 +154,6 @@ public class PullToRefreshRecyclerView extends FrameLayout {
                     canScroll = false;
                 }
                 break;
-
         }
         return super.onInterceptTouchEvent(ev);
     }
@@ -163,57 +162,35 @@ public class PullToRefreshRecyclerView extends FrameLayout {
     public boolean onTouchEvent(MotionEvent ev) {
         if (recyclerView == null || recyclerView.getChildCount() == 0)
             return super.onInterceptTouchEvent(ev);
-        if(isLoading)  return true;
+        if (isLoading) return true;
         int offerY = 0;
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 lastDownY = (int) ev.getY();
                 break;
             case MotionEvent.ACTION_MOVE:
-                //当前RecyclerView显示出来的最后一个的item的position
-                int lastPosition = -1;
-
-                RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
-                if (layoutManager instanceof GridLayoutManager) {
-                    lastPosition = ((GridLayoutManager) layoutManager).findLastVisibleItemPosition();
-                } else if (layoutManager instanceof LinearLayoutManager) {
-                    lastPosition = ((LinearLayoutManager) layoutManager).findLastVisibleItemPosition();
-                } else if (layoutManager instanceof StaggeredGridLayoutManager) {
-                    int[] lastPositions = new int[((StaggeredGridLayoutManager) layoutManager).getSpanCount()];
-                    ((StaggeredGridLayoutManager) layoutManager).findLastVisibleItemPositions(lastPositions);
-                    lastPosition = findMax(lastPositions);
-                }
-
-                offerY = (int) ev.getY() - lastDownY;
-                lastOfferY = offerY;
-                if (offerY < 0) {
-                    View lastView = recyclerView.getChildAt(recyclerView.getChildCount() - 1);
-                    if (lastView != null && lastView.getBottom() + footViewHeight <= getHeight() && lastPosition == recyclerView.getLayoutManager().getItemCount() - 1) {
-                        scrollTo(getScrollX(), -offerY / 2);
-                        imgArrow.setVisibility(VISIBLE);
-                        if (Math.abs(offerY) / 2 < footViewHeight) {
-                            progressBar.setVisibility(GONE);
-                            tvLoadTag.setText("上拉加载数据");
-                            if (!arrowIsTop) {
-                                imgArrow.startAnimation(topAnimation);
-                                arrowIsTop = true;
-                            }
-                            canLoad = false;
-                        } else {
-                            progressBar.setVisibility(GONE);
-                            tvLoadTag.setText("松手加载更多");
-                            if (arrowIsTop) {
-                                imgArrow.startAnimation(bottomAnimation);
-                                arrowIsTop = false;
-                            }
-                            canLoad = true;
+                if (canScroll) {
+                    offerY = (int) ev.getY() - lastDownY;
+                    lastOfferY = offerY;
+                    scrollTo(getScrollX(), -offerY / 2);
+                    imgArrow.setVisibility(VISIBLE);
+                    if (Math.abs(offerY) / 2 < footViewHeight) {
+                        progressBar.setVisibility(GONE);
+                        tvLoadTag.setText("上拉加载数据");
+                        if (!arrowIsTop) {
+                            imgArrow.startAnimation(topAnimation);
+                            arrowIsTop = true;
                         }
-                        return true;
-                    } else {
                         canLoad = false;
+                    } else {
+                        progressBar.setVisibility(GONE);
+                        tvLoadTag.setText("松手加载更多");
+                        if (arrowIsTop) {
+                            imgArrow.startAnimation(bottomAnimation);
+                            arrowIsTop = false;
+                        }
+                        canLoad = true;
                     }
-                } else {
-                    canLoad = false;
                 }
                 break;
             case MotionEvent.ACTION_UP:
@@ -221,7 +198,7 @@ public class PullToRefreshRecyclerView extends FrameLayout {
                     if (!canLoad) {
                         scrollTo(getScrollX(), 0);
                     } else {
-                        mScroller.startScroll(getScrollX(), getScrollY(), getScrollX(), - (Math.abs(lastOfferY) / 2 - footViewHeight));
+                        mScroller.startScroll(getScrollX(), getScrollY(), getScrollX(), -(Math.abs(lastOfferY) / 2 - footViewHeight));
                         lastOfferY = 0;
                         loadData();
                     }
