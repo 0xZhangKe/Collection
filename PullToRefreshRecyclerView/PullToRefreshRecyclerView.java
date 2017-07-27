@@ -3,7 +3,9 @@
 import android.content.Context;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -12,7 +14,11 @@ import android.view.animation.RotateAnimation;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.Scroller;
 import android.widget.TextView;
+
+import com.seagetech.ptduser.test.R;
+
 
 /**
  * Created by 张可 on 2017/7/5.
@@ -44,7 +50,11 @@ public class PullToRefreshRecyclerView extends FrameLayout {
     private RotateAnimation bottomAnimation;//箭头由上到下的动画
     private RotateAnimation topAnimation;//箭头由下到上的动画
 
+    private Scroller mScroller;
+
     private OnPullToBottomListener onPullToBottomListener;
+
+    private int lastOfferY = 0;
 
     public PullToRefreshRecyclerView(Context context) {
         super(context);
@@ -76,6 +86,8 @@ public class PullToRefreshRecyclerView extends FrameLayout {
         topAnimation = new RotateAnimation(180, 0, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         topAnimation.setDuration(200);
         topAnimation.setFillAfter(true);
+
+        mScroller = new Scroller(getContext());
     }
 
     public void setLayoutManager(RecyclerView.LayoutManager layout) {
@@ -110,15 +122,29 @@ public class PullToRefreshRecyclerView extends FrameLayout {
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         if (recyclerView == null || recyclerView.getChildCount() == 0)
             return super.onInterceptTouchEvent(ev);
+        if (isLoading) return true;
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 lastDownY = (int) ev.getY();
                 break;
             case MotionEvent.ACTION_MOVE:
+                int lastPosition = -1;
+
+                RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
+                if (layoutManager instanceof GridLayoutManager) {
+                    lastPosition = ((GridLayoutManager) layoutManager).findLastVisibleItemPosition();
+                } else if (layoutManager instanceof LinearLayoutManager) {
+                    lastPosition = ((LinearLayoutManager) layoutManager).findLastVisibleItemPosition();
+                } else if (layoutManager instanceof StaggeredGridLayoutManager) {
+                    int[] lastPositions = new int[((StaggeredGridLayoutManager) layoutManager).getSpanCount()];
+                    ((StaggeredGridLayoutManager) layoutManager).findLastVisibleItemPositions(lastPositions);
+                    lastPosition = findMax(lastPositions);
+                }
+
                 int offerY = (int) ev.getY() - lastDownY;
                 if (offerY < 0) {
                     View lastView = recyclerView.getChildAt(recyclerView.getChildCount() - 1);
-                    if (lastView != null && lastView.getBottom() + footViewHeight <= getHeight()) {
+                    if (lastView != null && lastView.getBottom() + footViewHeight <= getHeight() && lastPosition == recyclerView.getLayoutManager().getItemCount() - 1) {
                         canScroll = true;
                         return true;
                     } else {
@@ -137,15 +163,32 @@ public class PullToRefreshRecyclerView extends FrameLayout {
     public boolean onTouchEvent(MotionEvent ev) {
         if (recyclerView == null || recyclerView.getChildCount() == 0)
             return super.onInterceptTouchEvent(ev);
+        if(isLoading)  return true;
+        int offerY = 0;
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 lastDownY = (int) ev.getY();
                 break;
             case MotionEvent.ACTION_MOVE:
-                int offerY = (int) ev.getY() - lastDownY;
+                //当前RecyclerView显示出来的最后一个的item的position
+                int lastPosition = -1;
+
+                RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
+                if (layoutManager instanceof GridLayoutManager) {
+                    lastPosition = ((GridLayoutManager) layoutManager).findLastVisibleItemPosition();
+                } else if (layoutManager instanceof LinearLayoutManager) {
+                    lastPosition = ((LinearLayoutManager) layoutManager).findLastVisibleItemPosition();
+                } else if (layoutManager instanceof StaggeredGridLayoutManager) {
+                    int[] lastPositions = new int[((StaggeredGridLayoutManager) layoutManager).getSpanCount()];
+                    ((StaggeredGridLayoutManager) layoutManager).findLastVisibleItemPositions(lastPositions);
+                    lastPosition = findMax(lastPositions);
+                }
+
+                offerY = (int) ev.getY() - lastDownY;
+                lastOfferY = offerY;
                 if (offerY < 0) {
                     View lastView = recyclerView.getChildAt(recyclerView.getChildCount() - 1);
-                    if (lastView != null && lastView.getBottom() + footViewHeight <= getHeight()) {
+                    if (lastView != null && lastView.getBottom() + footViewHeight <= getHeight() && lastPosition == recyclerView.getLayoutManager().getItemCount() - 1) {
                         scrollTo(getScrollX(), -offerY / 2);
                         imgArrow.setVisibility(VISIBLE);
                         if (Math.abs(offerY) / 2 < footViewHeight) {
@@ -175,10 +218,11 @@ public class PullToRefreshRecyclerView extends FrameLayout {
                 break;
             case MotionEvent.ACTION_UP:
                 if (canScroll) {
-                    if (canLoad == false) {
+                    if (!canLoad) {
                         scrollTo(getScrollX(), 0);
                     } else {
-                        scrollTo(getScrollX(), footViewHeight);
+                        mScroller.startScroll(getScrollX(), getScrollY(), getScrollX(), - (Math.abs(lastOfferY) / 2 - footViewHeight));
+                        lastOfferY = 0;
                         loadData();
                     }
                     canScroll = false;
@@ -207,17 +251,38 @@ public class PullToRefreshRecyclerView extends FrameLayout {
      *
      * @param loading
      */
-    public void setLoading(boolean loading) {
+    public void setLoading(final boolean loading) {
         isLoading = loading;
         if (!isLoading) {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    progressBar.setVisibility(GONE);
-                    scrollTo(getScrollX(), 0);
+                    if (!loading) {
+                        progressBar.setVisibility(GONE);
+                        scrollTo(getScrollX(), 0);
+                    }
                 }
             });
         }
+    }
+
+    @Override
+    public void computeScroll() {
+        if (mScroller.computeScrollOffset()) {
+            scrollTo(mScroller.getCurrX(), mScroller.getCurrY());
+            invalidate();
+        }
+    }
+
+    //找到数组中的最大值
+    private int findMax(int[] lastPositions) {
+        int max = lastPositions[0];
+        for (int value : lastPositions) {
+            if (value > max) {
+                max = value;
+            }
+        }
+        return max;
     }
 
     public void setOnPullToBottomListener(OnPullToBottomListener onPullToBottomListener) {
