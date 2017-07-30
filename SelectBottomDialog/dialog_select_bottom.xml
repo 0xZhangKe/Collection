@@ -27,6 +27,7 @@
     </FrameLayout>
 
     <LinearLayout
+        android:id="@+id/vg_tab"
         android:layout_width="match_parent"
         android:layout_height="30dp"
         android:orientation="horizontal"
