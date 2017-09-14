@@ -2,13 +2,17 @@
 
 import android.content.Context;
 import android.support.annotation.Nullable;
+import android.support.v4.view.ViewPager;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewParent;
 import android.view.animation.Animation;
 import android.view.animation.RotateAnimation;
 import android.widget.FrameLayout;
@@ -24,7 +28,7 @@ import com.seagetech.ptduser.test.R;
  * Created by 张可 on 2017/7/5.
  */
 
-public class PullToRefreshRecyclerView extends FrameLayout {
+public class PullToRefreshRecyclerView extends FrameLayout implements SwipeRefreshLayout.OnChildScrollUpCallback {
 
     private static final String TAG = "PullToRefreshRecycler";
 
@@ -72,12 +76,12 @@ public class PullToRefreshRecyclerView extends FrameLayout {
         rootView = findViewById(R.id.root_view);
 
         recyclerView = (RecyclerView) rootView.findViewById(R.id.recycler_view);
-        footView = rootView.findViewById(R.id.footer_view);
-        progressBar = (ProgressBar) rootView.findViewById(R.id.progress);
-        tvLoadTag = (TextView) rootView.findViewById(R.id.tv_load_tag);
-        imgArrow = (ImageView) rootView.findViewById(R.id.img_arrow);
+        footView = findViewById(R.id.footer_view);
+        progressBar = (ProgressBar) findViewById(R.id.progress);
+        tvLoadTag = (TextView) findViewById(R.id.tv_load_tag);
+        imgArrow = (ImageView) findViewById(R.id.img_arrow);
 
-        footViewHeight = UiTools.dip2px(getContext(), 80);
+        footViewHeight = dip2px(getContext(), 80);
 
         bottomAnimation = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         bottomAnimation.setDuration(200);
@@ -122,7 +126,7 @@ public class PullToRefreshRecyclerView extends FrameLayout {
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         if (recyclerView == null || recyclerView.getChildCount() == 0)
             return super.onInterceptTouchEvent(ev);
-        if (isLoading) return true;
+        if(isLoading) return true;
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 lastDownY = (int) ev.getY();
@@ -162,8 +166,7 @@ public class PullToRefreshRecyclerView extends FrameLayout {
     public boolean onTouchEvent(MotionEvent ev) {
         if (recyclerView == null || recyclerView.getChildCount() == 0)
             return super.onInterceptTouchEvent(ev);
-        if (isLoading) return true;
-        int offerY = 0;
+        int offerY;
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 lastDownY = (int) ev.getY();
@@ -172,6 +175,7 @@ public class PullToRefreshRecyclerView extends FrameLayout {
                 if (canScroll) {
                     offerY = (int) ev.getY() - lastDownY;
                     lastOfferY = offerY;
+                    if(footView.getVisibility() == GONE) footView.setVisibility(VISIBLE);
                     scrollTo(getScrollX(), -offerY / 2);
                     imgArrow.setVisibility(VISIBLE);
                     if (Math.abs(offerY) / 2 < footViewHeight) {
@@ -198,7 +202,7 @@ public class PullToRefreshRecyclerView extends FrameLayout {
                     if (!canLoad) {
                         scrollTo(getScrollX(), 0);
                     } else {
-                        mScroller.startScroll(getScrollX(), getScrollY(), getScrollX(), -(Math.abs(lastOfferY) / 2 - footViewHeight));
+                        mScroller.startScroll(getScrollX(), getScrollY(), getScrollX(), -(Math.abs(lastOfferY) / 2 - footViewHeight), 500);
                         lastOfferY = 0;
                         loadData();
                     }
@@ -209,6 +213,16 @@ public class PullToRefreshRecyclerView extends FrameLayout {
         return super.onTouchEvent(ev);
     }
 
+    @Override
+    public boolean canChildScrollUp(SwipeRefreshLayout parent, @Nullable View child) {
+        if(recyclerView.getChildCount() > 0 && recyclerView.getChildAt(0).getTop() < recyclerView.getPaddingTop()){
+            Log.e(TAG, "canChildScrollUp return true");
+            return true;
+        }
+        Log.e(TAG, "canChildScrollUp return false");
+        return false;
+    }
+
     private void loadData() {
         isLoading = true;
         imgArrow.clearAnimation();
@@ -216,7 +230,12 @@ public class PullToRefreshRecyclerView extends FrameLayout {
         progressBar.setVisibility(VISIBLE);
         tvLoadTag.setText("正在加载...");
         if (this.onPullToBottomListener != null) {
-            this.onPullToBottomListener.onPullToBottom();
+            postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    PullToRefreshRecyclerView.this.onPullToBottomListener.onPullToBottom();
+                }
+            }, 500);
         } else {
             progressBar.setVisibility(GONE);
             scrollTo(getScrollX(), 0);
@@ -268,5 +287,17 @@ public class PullToRefreshRecyclerView extends FrameLayout {
 
     public interface OnPullToBottomListener {
         void onPullToBottom();
+    }
+
+    /**
+     * 将dip或dp值转换为px值，保证尺寸大小不变
+     *
+     * @param dipValue
+     * @param dipValue （DisplayMetrics类中属性density）
+     * @return
+     */
+    public static int dip2px(Context context, float dipValue) {
+        final float scale = context.getResources().getDisplayMetrics().density;
+        return (int) (dipValue * scale + 0.5f);
     }
 }
