@@ -148,7 +148,7 @@ public class PullToRefreshRecyclerView extends FrameLayout implements SwipeRefre
                 int offerY = (int) ev.getY() - lastDownY;
                 if (offerY < 0) {
                     View lastView = recyclerView.getChildAt(recyclerView.getChildCount() - 1);
-                    if (lastView != null && lastView.getBottom() + footViewHeight >= getHeight() && lastPosition == recyclerView.getLayoutManager().getItemCount() - 1) {
+                    if (lastView != null && lastView.getBottom() + footViewHeight <= getMeasuredHeight() && lastPosition == recyclerView.getLayoutManager().getItemCount() - 1) {
                         canScroll = true;
                         return true;
                     } else {
