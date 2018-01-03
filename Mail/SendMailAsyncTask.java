@@ -60,7 +60,7 @@ public class SendMailAsyncTask  extends AsyncTask<Integer, Integer, String> {
      */
     public static void sendMail() {
         final String sendUserName = "zhangke_711@163.com";
-        final String sendPassword = "zk151018";
+        final String sendPassword = "******";
 
         Properties properties = System.getProperties();
         properties.setProperty("mail.smtp.auth", "true");//服务器需要认证
