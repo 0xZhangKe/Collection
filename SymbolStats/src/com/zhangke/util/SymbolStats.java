@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.DecimalFormat;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.regex.Matcher;
@@ -19,12 +21,12 @@ public class SymbolStats {
     /**
      * 目标文件夹
      */
-    private String targetDir = "/home/zhangke/";
-    private char[] hitCharArray = new char[26 * 2];
+    private String targetDir = "D:\\Mine";
+    private final HashMap<String, Integer> hitSymbolMap = new HashMap<>();
     /**
      * 匹配是否为文本文件
      */
-    final Pattern mFileNamePattern = Pattern.compile("^.*?\\.(java|py|c|cpp|xml|html|cs|bat|shell|sql|js|)$");
+    final Pattern mFileNamePattern = Pattern.compile("^.*?\\.(java|py|c|cpp|html|cs|bat|shell|sql|js|)$");
 
     /**
      * 文件个数
@@ -32,7 +34,7 @@ public class SymbolStats {
     private int mFileCount = 0;
 
     private CountDownLatch mCountDownLatch = new CountDownLatch(DEFAULT_POLL_SIZE);
-    private LinkedBlockingQueue<File> mFileQueue = new LinkedBlockingQueue<>();
+    private final LinkedBlockingQueue<File> mFileQueue = new LinkedBlockingQueue<>();
 
     private ComputeSymbolThread[] computeSymbolThreadPool = new ComputeSymbolThread[DEFAULT_POLL_SIZE];
     private Runnable loopDirRunnable = new Runnable() {
@@ -40,7 +42,7 @@ public class SymbolStats {
         public void run() {
             loopDir(targetDir);
             loopEnd = true;
-            System.out.println(String.format("File count：%s", mFileCount));
+            loopDirEndTime = System.currentTimeMillis();
         }
     };
 
@@ -49,15 +51,10 @@ public class SymbolStats {
      */
     private boolean loopEnd;
 
+    private long loopDirEndTime;
+
     public SymbolStats() {
-        long start = System.currentTimeMillis();
-        int count = 0;
-        for (int i = 'a'; i <= 'z'; i++) {
-            hitCharArray[count++] = (char) i;
-        }
-        for (int i = 'A'; i <= 'Z'; i++) {
-            hitCharArray[count++] = (char) i;
-        }
+        long startTime = System.currentTimeMillis();
 
         loopEnd = false;
         new Thread(loopDirRunnable).start();
@@ -72,8 +69,31 @@ public class SymbolStats {
             for (int i = 0; i < computeSymbolThreadPool.length; i++) {
                 codeLineCount += computeSymbolThreadPool[i].getCodeLineCount();
             }
-            System.out.println(String.format("Total line：%s", codeLineCount));
-            System.out.println(String.format("Taking %s ms", System.currentTimeMillis() - start));
+
+            System.out.println(String.format("\t%s text files.", mFileCount));
+            System.out.println(String.format("\t%s lines code.", codeLineCount));
+            long taking = System.currentTimeMillis() - startTime;
+            double fileTaking = ((double) mFileCount) / ((double) loopDirEndTime) * 1000.0;
+            double lineTaking = ((double) codeLineCount) / ((double) taking) * 1000.0;
+
+            System.out.println(String.format("\tT=%s ms ( %.1f files/s, %.1f lines/s)",
+                    taking,
+                    fileTaking,
+                    lineTaking));
+
+            List<Map.Entry<String, Integer>> list = new ArrayList<Map.Entry<String, Integer>>(hitSymbolMap.entrySet());
+            Collections.sort(list, new Comparator<Map.Entry<String, Integer>>() {
+                @Override
+                public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
+                    return o2.getValue() - o1.getValue();
+                }
+            });
+            int count = 1;
+            for (Map.Entry<String, Integer> mapping : list) {
+                System.out.println(String.format("\t%s\t%s\t%s", count, mapping.getKey(), mapping.getValue()));
+                if (count > 9) break;
+                count++;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -130,7 +150,9 @@ public class SymbolStats {
      */
     private void addFileToQueue(final File file) {
         try {
-            mFileQueue.put(file);
+            synchronized (mFileQueue) {
+                mFileQueue.put(file);
+            }
             mFileCount++;
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -169,6 +191,17 @@ public class SymbolStats {
                     String line = null;
                     while ((line = reader.readLine()) != null) {
                         codeLineCount++;
+                        line = line.trim();
+                        if (line != null && line.length() > 0) {
+                            if (line.contains(" ")) {
+                                String[] symbolArray = line.split(" ");
+                                for (String symbol : symbolArray) {
+                                    addWord(symbol);
+                                }
+                            } else {
+                                addWord(line);
+                            }
+                        }
                     }
                     reader.close();
                 } catch (IOException e) {
@@ -192,11 +225,41 @@ public class SymbolStats {
             }
         }
 
+        private void addWord(String str) {
+            if (isLetter(str)) {
+                synchronized (hitSymbolMap) {
+                    int count;
+                    if (hitSymbolMap.containsKey(str)) {
+                        count = hitSymbolMap.get(str) + 1;
+                    } else {
+                        count = 1;
+                    }
+                    hitSymbolMap.put(str, count);
+                }
+            }
+        }
+
         /**
          * 获取当前线程检测到的代码行数
          */
         int getCodeLineCount() {
             return codeLineCount;
+        }
+
+        /**
+         * 判断当前字符串是否由字母组成
+         */
+        private boolean isLetter(String str) {
+            if (str == null || str.length() <= 0) {
+                return false;
+            }
+            char[] chars = str.toCharArray();
+            for (int i = 0; i < chars.length; i++) {
+                if (!(chars[i] >= 'a' && chars[i] <= 'z') || (chars[i] >= 'A' && chars[i] <= 'Z')) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 
