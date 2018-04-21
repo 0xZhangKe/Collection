@@ -92,6 +92,13 @@ public class PullToRefreshRecyclerView extends FrameLayout implements SwipeRefre
         topAnimation.setFillAfter(true);
 
         mScroller = new Scroller(getContext());
+
+        getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                requestLayout();
+            }
+        });
     }
 
     public void setLayoutManager(RecyclerView.LayoutManager layout) {
@@ -243,22 +250,13 @@ public class PullToRefreshRecyclerView extends FrameLayout implements SwipeRefre
     }
 
     /**
-     * 设置是否正在加载，一般来书，在加载完毕之后应该调用此方法
-     *
-     * @param loading
+     * 设置是否正在加载，一般来说，在加载完毕之后应该调用此方法
      */
-    public void setLoading(final boolean loading) {
-        isLoading = loading;
-        if (!isLoading) {
-            post(new Runnable() {
-                @Override
-                public void run() {
-                    if (!loading) {
-                        progressBar.setVisibility(GONE);
-                        scrollTo(getScrollX(), 0);
-                    }
-                }
-            });
+    public void closeLoading() {
+        if (isLoading) {
+            progressBar.setVisibility(GONE);
+            scrollTo(getScrollX(), 0);
+            isLoading = false;
         }
     }
 
@@ -274,9 +272,7 @@ public class PullToRefreshRecyclerView extends FrameLayout implements SwipeRefre
     private int findMax(int[] lastPositions) {
         int max = lastPositions[0];
         for (int value : lastPositions) {
-            if (value > max) {
-                max = value;
-            }
+            max = value > max ? value : max;
         }
         return max;
     }
