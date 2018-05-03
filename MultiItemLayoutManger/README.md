@@ -7,16 +7,21 @@ RecyclerView 已经被人玩出了各种花样，但是关于多种布局的 Ite
 <div align="center">
 <img src="https://img-blog.csdn.net/20180503234312141?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM4NzI4NTc=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" width = "300" height = "550"  alt="预览图" align=center/>
 </div>
-包括图中的 Banner ，子标题，按钮等所有的元素都是通过一个 RecyclerView 来实现的，苦于没找到相关博客只能自己写一个了，其实还是很简单的，下面来看一下实现方式。
+包括图中的 Banner ，子标题，按钮等所有的元素都是通过一个 RecyclerView 来实现的，苦于没找到相关博客只能自己写一个了，其实还是很简单的，下面来看一下实现方式。</br>
+
 # 实现方式
+
 在 Adapter 中有关于设置 ItemViewType 的方法，但是仅仅通过设置 Adapter 并不能实现上面的功能，还需要结合 LayoutManager 来实现，这是因为子 View 的大小及位置是由 LayoutManager 负责管理。按照上面的样式需要三个 ItemViewType，如下：
+
 ```java
 public static final int BANNER_ITEM_TYPE = 0;
 public static final int TITLE_ITEM_TYPE = 1;
 public static final int MENU_ITEM_TYPE = 2;
 ```
+
 这里之所以使用 public static 修饰是因为这三个属性 Adapter 中也需要使用。</p>
 下面需要根据这三种 Type 来分别设置子 View：
+
 ```java
 @Override
 public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
@@ -88,6 +93,7 @@ public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State 
     totalHeight = Math.max(curLineTop, getVerticalSpace());
 }
 ```
+
 上面的注释写的很清楚了，还是比较简单的，除此之外还需要使 RecyclerView 可以上下滑动：
 ```java
 @Override
@@ -108,7 +114,9 @@ public int scrollVerticallyBy(int dy, RecyclerView.Recycler recycler, RecyclerVi
     return travel;
 }
 ```
-下面当上全部代码：
+
+下面放上全部代码：
+
 ```java
 package com.zhangke.widget;
 
