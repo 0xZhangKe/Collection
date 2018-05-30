@@ -98,6 +98,7 @@ public class MultiItemLayoutManger extends RecyclerView.LayoutManager {
         }
         //计算总高度，滑动时需要使用
         totalHeight = Math.max(curLineTop, getVerticalSpace());
+        verticalScrollOffset = 0;
     }
 
     @Override
