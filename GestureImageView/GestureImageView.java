@@ -52,13 +52,19 @@ public class GestureImageView extends AppCompatImageView {
      */
     private float[] pointerDownY = new float[2];
     /**
-     * 两个手指最开始点下时的距离
+     * 两个手指上次点下时的距离
      */
-    private float initDistance = 0.0F;
+    private float lastDistance = 0.0F;
     /**
      * 图片实际宽度
      */
-    private float imageRealWidth = 0;
+    private float imageRealWidth = 0.0F;
+    /**
+     * 图片实际高度
+     */
+    private float imageRealHeight = 0.0F;
+
+    private Matrix mImageMatrix;
 
     public GestureImageView(Context context) {
         super(context);
@@ -79,31 +85,42 @@ public class GestureImageView extends AppCompatImageView {
         setScaleType(ScaleType.MATRIX);
     }
 
+    /**
+     * 此方法被调用后调用 getWidth 方法才能获取到数值，
+     * onMeasure 只能获取到 getMeasureWidth
+     */
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        adjustDrawable();
+    }
+
+    /**
+     * 将图片调整至 ImageView 的中间
+     */
+    public void adjustDrawable() {
+        Log.i(TAG, "adjustDrawable");
+        scaleAndTranslate(-1.0F, -1.0F);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        //是否处理该事件
-        boolean handled = false;
-        //屏幕上手指数量
-        int count = event.getPointerCount();
-        String eventType = "";
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 resetTouchStatus();
                 pointerIds[0] = event.getPointerId(0);
                 pointerDownX[0] = event.getX();
                 pointerDownY[0] = event.getY();
-                eventType = "DOWN";
                 lastClickTime = System.currentTimeMillis();
                 break;
             case MotionEvent.ACTION_UP:
                 resetTouchStatus();
-                eventType = "UP";
                 if (System.currentTimeMillis() - lastClickTime < CLICK_THRESHOLD) {
-                    handled = performClick();
+                    //处理点击事件
+                    performClick();
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
-                eventType = "MOVE";
                 if (needProcessMove()) {
                     int firstPointerIndex = event.findPointerIndex(pointerIds[0]);
                     int secondPointerIndex = event.findPointerIndex(pointerIds[1]);
@@ -115,30 +132,27 @@ public class GestureImageView extends AppCompatImageView {
                         float secondPointX = event.getX(secondPointerIndex);
                         float secondPointY = event.getY(secondPointerIndex);
                         float distance = getDistance(firstPointX, firstPointY, secondPointX, secondPointY);
-                        scaleImage(distance);
+                        scaleImage(distance - lastDistance);
+                        lastDistance = distance;
                     }
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
                 resetTouchStatus();
-                eventType = "CANCEL";
                 break;
             case MotionEvent.ACTION_OUTSIDE:
                 resetTouchStatus();
-                eventType = "OUTSIDE";
                 break;
             case MotionEvent.ACTION_POINTER_DOWN:
-                eventType = "POINTER_DOWN";
                 if (pointerIds[1] == DEFAULT_POINT_ID) {
                     pointerIds[1] = event.getPointerId(event.getActionIndex());
                     int pointerIndex = event.findPointerIndex(pointerIds[1]);
                     pointerDownX[1] = event.getX(pointerIndex);
                     pointerDownY[1] = event.getY(pointerIndex);
-                    initDistance = getDistance(pointerDownX[0], pointerDownY[0], pointerDownX[1], pointerDownY[1]);
+                    lastDistance = getDistance(pointerDownX[0], pointerDownY[0], pointerDownX[1], pointerDownY[1]);
                 }
                 break;
             case MotionEvent.ACTION_POINTER_UP:
-                eventType = "POINTER_UP";
                 int curPointId = event.getPointerId(event.getActionIndex());
                 if (pointerIds[0] == curPointId) {
                     pointerIds[0] = DEFAULT_POINT_ID;
@@ -147,28 +161,11 @@ public class GestureImageView extends AppCompatImageView {
                 }
                 break;
         }
-        StringBuilder builder = new StringBuilder();
-        builder.append(eventType);
-        builder.append(",count:");
-        builder.append(count);
-        builder.append("\n");
-        for (int i = 0; i < count; i++) {
-            //PointerId
-            int pointId = event.getPointerId(i);
-            //pointerIndex
-            int pointerIndex = event.findPointerIndex(pointId);
-            builder.append(String.format("index:%s, pointId:%s, pointerIndex:%s\n", i, pointId, pointerIndex));
-        }
-        Log.i(TAG, builder.toString());
-        if (handled) {
-            return true;
-        }
         return true;
     }
 
     @Override
     public boolean performClick() {
-        Log.i(TAG, "performClick()");
         return super.performClick();
     }
 
@@ -176,15 +173,6 @@ public class GestureImageView extends AppCompatImageView {
         lastClickTime = 0L;
         pointerIds[0] = DEFAULT_POINT_ID;
         pointerIds[1] = DEFAULT_POINT_ID;
-        Matrix matrix = getMatrix();
-        if (matrix != null) {
-            float[] array = new float[9];
-            matrix.getValues(array);
-            float scaleX = array[0];
-            if (scaleX > 0) {
-                imageRealWidth = getWidth() * scaleX;
-            }
-        }
     }
 
     private boolean needProcessMove() {
@@ -206,26 +194,70 @@ public class GestureImageView extends AppCompatImageView {
      * @param distance 双指滑动距离初始状态下的距离，可为负数
      */
     private void scaleImage(float distance) {
-        Matrix matrix = getMatrix();
         float scale = getScale(distance);
-        matrix.setScale(scale, scale);
-        setImageMatrix(matrix);
+        scaleAndTranslate(scale, scale);
     }
 
     /**
      * 获取缩放值
      */
     private float getScale(float distance) {
-        if (Math.abs(distance - 0.0F) < 1.0F) {
+        if (Math.abs(distance - 0.0F) < 1.0F || getDrawable() == null) {
             return 0F;
         }
-        float anchorWidth;
-        if (imageRealWidth == 0) {
-            anchorWidth = getDrawable().getIntrinsicWidth();
-        } else {
-            anchorWidth = imageRealWidth;
+        if (imageRealWidth == 0.0F) {
+            imageRealWidth = getDrawable().getIntrinsicWidth();
         }
-        float willWidth = anchorWidth + distance / 2;
-        return willWidth / getDrawable().getIntrinsicWidth();
+        int drawableWidth = getDrawable().getIntrinsicWidth();
+//        float curScale = imageRealWidth / drawableWidth;
+        float willWidth = imageRealWidth + distance;
+        Log.i(TAG, String.format("distance:%s, willWidth:%s", distance, willWidth));
+        return willWidth / drawableWidth;
+    }
+
+    private void scaleAndTranslate(float scaleX, float scaleY) {
+        if (getDrawable() == null) {
+            return;
+        }
+        if (imageRealWidth == 0.0F) {
+            imageRealWidth = getDrawable().getIntrinsicWidth();
+        }
+        if (imageRealHeight == 0.0F) {
+            imageRealHeight = getDrawable().getIntrinsicHeight();
+        }
+        if (imageRealWidth == 0.0F || imageRealHeight == 0.0F) {
+            return;
+        }
+        if (scaleX == -1.0F || (needScale(scaleX) && needScale(scaleY))) {
+            if (mImageMatrix == null) {
+                mImageMatrix = new Matrix();
+            } else {
+                mImageMatrix.reset();
+            }
+            if (scaleX != -1.0F) {
+                mImageMatrix.postScale(scaleX, scaleY);
+                imageRealWidth = getDrawable().getIntrinsicWidth() * scaleX;
+                imageRealHeight = getDrawable().getIntrinsicHeight() * scaleY;
+            }
+            float translateX;
+            float translateY;
+            int viewWidth = getWidth();
+            int viewHeight = getHeight();
+            translateX = (viewWidth - imageRealWidth) / 2.0F;
+            translateY = (viewHeight - imageRealHeight) / 2.0F;
+            if (translateX + translateY != 0) {
+                mImageMatrix.postTranslate(translateX, translateY);
+            }
+            float[] values = new float[9];
+            mImageMatrix.getValues(values);
+            Log.i(TAG, String.format("imageRealWidth:%s, imageRealHeight:%s, scaleX:%s, scaleY:%s, translateX:%s, translateY:%s",
+                    imageRealWidth, imageRealHeight, values[Matrix.MSCALE_X],
+                    values[Matrix.MSCALE_Y], values[Matrix.MTRANS_X], values[Matrix.MTRANS_Y]));
+            setImageMatrix(mImageMatrix);
+        }
+    }
+
+    private boolean needScale(float scale) {
+        return scale >= MIN_MULTIPLE && scale <= MAX_MULTIPLE && scale != 1.0F;
     }
 }
