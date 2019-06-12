@@ -1,20 +1,17 @@
-package com.zhangke.eventtest;
+package com.zhangke.widget;
 
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Stack;
@@ -44,7 +41,9 @@ public class DrawView extends View {
      * 历史路径
      */
     private List<DrawPath> mDrawMoveHistory = new ArrayList<>();
-
+    /**
+     * 用于生成随机数，随机取出颜色数组中的颜色
+     */
     private Random random = new Random();
 
     public DrawView(Context context) {
@@ -62,7 +61,7 @@ public class DrawView extends View {
         init();
     }
 
-    public void init() {
+    private void init() {
         mPaint.setAntiAlias(true);
         mPaint.setStyle(Paint.Style.STROKE);
         mPaint.setStrokeCap(Paint.Cap.ROUND);
@@ -74,9 +73,13 @@ public class DrawView extends View {
         //多指触控需要使用 getActionMasked
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN: {
+                //处理点击事件
                 performClick();
+                //重置所有 PointerId 为 -1
                 clearTouchRecordStatus();
+                //新增一个轨迹
                 addNewPath(event);
+                //重绘
                 invalidate();
                 return true;
             }
@@ -89,8 +92,10 @@ public class DrawView extends View {
                             //遍历绘制记录表，通过 ID 找到对应的记录
                             if (itemPointerId == itemPath.pointerId) {
                                 int pointerIndex = event.findPointerIndex(itemPointerId);
+                                //通过 pointerIndex 获取到此次滑动事件的所有历史轨迹
                                 List<PointF> recordList = readPointList(event, pointerIndex);
                                 if (!listEquals(recordList, itemPath.record.peek())) {
+                                    //判断该 List 是否已存在，不存在则添加进去
                                     itemPath.record.push(recordList);
                                     addPath(recordList, itemPath.path);
                                 }
@@ -106,6 +111,7 @@ public class DrawView extends View {
                 int pointerId = event.getPointerId(event.getActionIndex());
                 for (DrawPath item : mDrawMoveHistory) {
                     if (item.pointerId == pointerId) {
+                        //该手指已绘制结束，将此 PointerId 重置为 -1
                         item.pointerId = -1;
                     }
                 }
@@ -116,6 +122,7 @@ public class DrawView extends View {
                 invalidate();
                 break;
             case MotionEvent.ACTION_UP:
+                //最后一根手指抬起，重置所有 PointerId
                 clearTouchRecordStatus();
                 break;
             case MotionEvent.ACTION_CANCEL:
@@ -149,6 +156,9 @@ public class DrawView extends View {
         return list;
     }
 
+    /**
+     * 判断两个列表中所有的数据是否相同
+     */
     private boolean listEquals(List<PointF> lis1, List<PointF> list2) {
         if (lis1.equals(list2)) {
             return true;
@@ -251,7 +261,9 @@ public class DrawView extends View {
          * 曲线路径
          */
         private Path path;
-
+        /**
+         * 轨迹列表，用于判断目标轨迹是否已添加进来
+         */
         private Stack<List<PointF>> record;
 
         DrawPath(int pointerId, int drawColor, Path path) {
